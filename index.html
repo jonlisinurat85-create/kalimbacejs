@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mini Studio Pro</title>
+
+<style>
+body{
+    margin:0;
+    font-family:Arial;
+    background:linear-gradient(135deg,#141e30,#243b55);
+    color:white;
+    text-align:center;
+}
+h1{padding:10px;}
+.section{margin-top:20px;}
+.keys{display:flex;justify-content:center;flex-wrap:wrap;}
+.key{
+    width:55px;height:160px;
+    margin:5px;
+    background:#f5deb3;
+    border-radius:10px;
+    display:flex;
+    align-items:flex-end;
+    justify-content:center;
+    cursor:pointer;
+    color:black;
+    font-weight:bold;
+}
+.key:active{background:yellow;}
+button{
+    margin:5px;
+    padding:8px 15px;
+    border:none;
+    border-radius:5px;
+    cursor:pointer;
+    background:#ff9800;
+    color:white;
+}
+input{width:150px;}
+select{padding:5px;}
+</style>
+</head>
+<body>
+
+<h1>🎵 Mini Studio Pro</h1>
+
+<div class="section">
+<h3>🎤 Recorder</h3>
+<button onclick="startRecording()">Record</button>
+<button onclick="stopRecording()">Stop</button>
+<button onclick="playRecording()">Play</button>
+<button onclick="downloadRecording()">Download</button>
+</div>
+
+<div class="section">
+<h3>🥁 Drum Machine</h3>
+Tempo (BPM):
+<select id="tempo">
+<option value="60">60</option>
+<option value="80">80</option>
+<option value="100" selected>100</option>
+<option value="120">120</option>
+<option value="140">140</option>
+</select>
+<br>
+<button onclick="startBeat()">Start Beat</button>
+<button onclick="stopBeat()">Stop Beat</button>
+</div>
+
+<div class="section">
+<h3>🎛 Mixer</h3>
+Kalimba <input type="range" min="0" max="1" step="0.1" value="0.5" id="kalimbaVol"><br>
+Piano <input type="range" min="0" max="1" step="0.1" value="0.5" id="pianoVol"><br>
+Beat <input type="range" min="0" max="1" step="0.1" value="0.5" id="beatVol"><br>
+</div>
+
+<div class="section">
+<h3>🎵 Kalimba</h3>
+<div class="keys" id="kalimba"></div>
+</div>
+
+<div class="section">
+<h3>🎹 Piano</h3>
+<div class="keys" id="piano"></div>
+</div>
+
+<script>
+let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+let recordedChunks=[], mediaRecorder, audioBlob;
+let beatInterval;
+
+// ===== CREATE KEYS =====
+function createKeys(containerId,type,baseFreq){
+    let container=document.getElementById(containerId);
+    for(let i=0;i<8;i++){
+        let key=document.createElement("div");
+        key.className="key";
+        key.innerText=i+1;
+        key.onclick=()=>playSound(baseFreq*Math.pow(1.05946,i), type);
+        container.appendChild(key);
+    }
+}
+createKeys("kalimba","kalimba",261.63);
+createKeys("piano","piano",130.81);
+
+// ===== PLAY SOUND =====
+function playSound(freq,type){
+    let osc=audioCtx.createOscillator();
+    let gain=audioCtx.createGain();
+
+    osc.frequency.value=freq;
+    osc.type= type==="piano" ? "square":"sine";
+
+    let volume=document.getElementById(type==="piano"?"pianoVol":"kalimbaVol").value;
+    gain.gain.value=volume;
+
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    osc.start();
+    osc.stop(audioCtx.currentTime+0.8);
+}
+
+// ===== DRUM MACHINE =====
+function startBeat(){
+    stopBeat();
+    let bpm=document.getElementById("tempo").value;
+    let interval=(60/bpm)*1000;
+    let count=0;
+
+    beatInterval=setInterval(()=>{
+        let osc=audioCtx.createOscillator();
+        let gain=audioCtx.createGain();
+
+        osc.type="triangle";
+        osc.frequency.value= count%4===0 ? 100 : 200; // Kick & Snare
+        gain.gain.value=document.getElementById("beatVol").value;
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc.start();
+        osc.stop(audioCtx.currentTime+0.2);
+
+        count++;
+    },interval);
+}
+function stopBeat(){ clearInterval(beatInterval); }
+
+// ===== RECORDER =====
+async function startRecording(){
+    let stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    mediaRecorder=new MediaRecorder(stream);
+    recordedChunks=[];
+    mediaRecorder.ondataavailable=e=>{
+        if(e.data.size>0) recordedChunks.push(e.data);
+    };
+    mediaRecorder.start();
+    alert("Recording...");
+}
+function stopRecording(){
+    mediaRecorder.stop();
+    mediaRecorder.onstop=()=>{
+        audioBlob=new Blob(recordedChunks,{type:"audio/webm"});
+        alert("Recording Saved");
+    };
+}
+function playRecording(){
+    if(!audioBlob){alert("No recording!");return;}
+    let audio=new Audio(URL.createObjectURL(audioBlob));
+    audio.play();
+}
+function downloadRecording(){
+    if(!audioBlob){alert("No recording!");return;}
+    let a=document.createElement("a");
+    a.href=URL.createObjectURL(audioBlob);
+    a.download="rekaman.webm";
+    a.click();
+}
+</script>
+
+</body>
+</html>
